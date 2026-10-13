@@ -1,167 +1,253 @@
-
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const MAP_WIDTH = 1250;
-const MAP_HEIGHT = 1350;
+// These dimensions match the supplied updated HTML floor plan.
+const MAP_WIDTH = 1000;
+const MAP_HEIGHT = 1500;
 
+// Simulation scale: each SVG unit represents 1 cm (0.01 meters).
 const METERS_PER_UNIT = 0.01;
-const METERS_PER_MILE = 1609.344;
 
-const svgMap = `
-<svg xmlns="http://www.w3.org/2000/svg" width="1250" height="1350" viewBox="0 0 1250 1350">
-  <rect width="1250" height="1350" fill="#f1f5f9"/>
+const svgMap = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1500" width="1000" height="1500">
+            <defs>
+                <marker id="door-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+                </marker>
+                <marker id="entrance-arrow" viewBox="0 0 12 12" refX="8" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                    <path d="M 1 2 L 10 6 L 1 10 z" fill="#0284c7" />
+                </marker>
+            </defs>
 
-  <!-- Main corridor -->
-  <path d="M79 80 H430 V1166 H64 V993 H41 V560 H60 V300 H73 V190 H79 Z"
-        fill="#fff" stroke="#475569" stroke-width="6"/>
+            <rect width="1000" height="1500" fill="#f8fafc"/>
 
-  <line x1="79" y1="80" x2="430" y2="80"
-        stroke="#475569" stroke-width="6"/>
+            <!-- ================= 1. الأرضيات ================= -->
+            <path d="
+                M 660,165 
+                L 950,165 
+                L 950,420 
+                L 965,420 
+                L 965,900 
+                L 950,900 
+                L 950,1110 
+                L 925,1110 
+                L 925,1230 
+                L 940,1230 
+                L 940,1245 
+                L 940,1400 
+                L 660,1400 
+                Z" 
+                fill="#ffffff"/>
 
-  <line x1="79" y1="80" x2="79" y2="190"
-        stroke="#38bdf8" stroke-width="3"
-        stroke-dasharray="6 6"/>
+            <polygon points="60,165 660,165 660,760 60,760" fill="#f1f5f9"/>
+            <polygon points="60,772 660,772 660,1350 60,1350" fill="#f1f5f9"/>
 
-  <line x1="28" y1="135" x2="115" y2="135"
-        stroke="#0284c7" stroke-width="4"/>
+            <!-- ================= 2. المستطيلات والطاولات ================= -->
+            <!-- أثاث Lab 227 -->
+            <g id="furniture-lab227">
+                <!-- طاولة الحائط العلوي -->
+                <rect x="180" y="195" width="370" height="45" rx="5" fill="#94a3b8" opacity="0.65"/>
+                
+                <!-- طاولة الحائط الأيسر -->
+                <rect x="80" y="270" width="45" height="380" rx="5" fill="#94a3b8" opacity="0.65"/>
 
-  <rect x="122" y="118" width="138" height="34"
-        rx="7" fill="#0f172a"/>
+                <!-- طاولة الحائط السفلي -->
+                <rect x="180" y="685" width="370" height="45" rx="5" fill="#94a3b8" opacity="0.65"/>
 
-  <text x="191" y="139" fill="#38bdf8"
-        font-size="11" font-family="Arial"
-        font-weight="bold" text-anchor="middle">
-    MAIN ENTRANCE
-  </text>
+                <!-- طاولة الحائط الأيمن أسفل الباب (مكان الخط الأحمر) -->
+                <rect x="605" y="400" width="45" height="260" rx="5" fill="#94a3b8" opacity="0.65"/>
 
-  <path d="M73 190 V300 H60 V560 H41 V993 H64 V1166 H430"
-        fill="none" stroke="#475569" stroke-width="6"/>
+                <!-- المستطيل الأصفر الأوسط بعد تطويله -->
+                <rect x="260" y="445" width="210" height="65" rx="8" fill="#f59e0b" opacity="0.85"/>
 
-  <!-- Lab 227 -->
-  <path d="M430 60 H490 V80 H720 V100 H853 V80 H1073 V60
-    H1137 V123 H1157 V440 H1133 V553 H1157 V600 H1132
-    V614 H922 V600 H896 V614 H686 V600 H450 V580 H430 Z"
-    fill="#cbd5e1" stroke="#475569" stroke-width="5"/>
+                <!-- اسم المعمل بارز في أعلى المنتصف -->
+                <rect x="300" y="255" width="130" height="36" rx="8" fill="#1e293b" opacity="0.9"/>
+                <text x="365" y="280" fill="#ffffff" font-size="20" font-family="Arial" font-weight="bold" text-anchor="middle">Lab 227</text>
+            </g>
 
-  <!-- Lab 226 -->
-  <path d="M430 580 H450 V600 H686 V614 H896 V600 H922
-    V614 H1132 V600 H1157 V750 H1135 V860 H1157 V1140
-    H1091 V1166 H871 V1131 H741 V1166 H706 V1146 H430 Z"
-    fill="#cbd5e1" stroke="#475569" stroke-width="5"/>
+            <!-- أثاث Lab 226 -->
+            <g id="furniture-lab226">
+                <!-- طاولة الحائط العلوي -->
+                <rect x="180" y="800" width="370" height="45" rx="5" fill="#94a3b8" opacity="0.65"/>
+                
+                <!-- طاولة الحائط الأيسر -->
+                <rect x="80" y="875" width="45" height="380" rx="5" fill="#94a3b8" opacity="0.65"/>
 
-  <!-- Doors -->
-  <rect x="424" y="460" width="12" height="120"
-        rx="4" fill="#22c55e" opacity=".3"/>
+                <!-- طاولة الحائط السفلي -->
+                <rect x="180" y="1280" width="370" height="45" rx="5" fill="#94a3b8" opacity="0.65"/>
 
-  <path d="M430 580 L495 515"
-        stroke="#3b82f6" stroke-width="4"/>
+                <!-- طاولة الحائط الأيمن أسفل الباب (مكان الخط الأحمر في الصورة) -->
+                <rect x="605" y="1070" width="45" height="260" rx="5" fill="#94a3b8" opacity="0.65"/>
 
-  <rect x="424" y="989" width="12" height="120"
-        rx="4" fill="#22c55e" opacity=".3"/>
+                <!-- المستطيل الأصفر الأوسط بعد تطويله -->
+                <rect x="260" y="1035" width="210" height="65" rx="8" fill="#f59e0b" opacity="0.85"/>
 
-  <path d="M430 1109 L495 1044"
-        stroke="#3b82f6" stroke-width="4"/>
+                <!-- اسم المعمل بارز في أعلى المنتصف -->
+                <rect x="300" y="860" width="130" height="36" rx="8" fill="#1e293b" opacity="0.9"/>
+                <text x="365" y="885" fill="#ffffff" font-size="20" font-family="Arial" font-weight="bold" text-anchor="middle">Lab 226</text>
+            </g>
 
-  <line x1="430" y1="80" x2="430" y2="464"
-        stroke="#475569" stroke-width="6"/>
+            <!-- ================= 3. الحوائط والكسرات المعمارية ================= -->
+            <g fill="none" stroke="#000000" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter">
+                
+                <line x1="660" y1="165" x2="950" y2="165" />
 
-  <line x1="430" y1="580" x2="430" y2="993"
-        stroke="#475569" stroke-width="6"/>
+                <!-- جدار الطرقة الأيمن مع الكسرة والسنة البارزة والفتحة -->
+                <line x1="950" y1="165" x2="950" y2="420" />
+                <line x1="950" y1="420" x2="965" y2="420" />
+                <line x1="965" y1="420" x2="965" y2="900" />
+                <line x1="965" y1="900" x2="950" y2="900" />
+                
+                <path d="
+                    M 950,900 
+                    L 950,1110 
+                    L 925,1110 
+                    L 925,1230 
+                    L 940,1230" />
+                
+                <line x1="950" y1="1310" x2="950" y2="1400" />
+                <line x1="660" y1="1400" x2="950" y2="1400" />
 
-  <line x1="430" y1="1109" x2="430" y2="1166"
-        stroke="#475569" stroke-width="6"/>
+                <!-- حوائط Lab 227 -->
+                <path d="M 60,165 L 250,165 L 250,145 L 450,145 L 450,165 L 660,165" />
+                <path d="
+                    M 60,165 
+                    L 60,240 
+                    L 45,240 
+                    L 45,430 
+                    L 60,430 
+                    L 60,580 
+                    L 45,580 
+                    L 45,690 
+                    L 60,690 
+                    L 60,760" />
 
-  <!-- Furniture in Lab 227 -->
-  <rect x="490" y="110" width="160" height="140"
-        rx="6" fill="#94a3b8" opacity=".45"/>
+                <!-- الجدار الفاصل بين الغرفتين -->
+                <path d="
+                    M 60,760 
+                    L 230,760 
+                    L 230,745 
+                    L 260,745 
+                    L 260,760 
+                    L 430,760 
+                    L 430,745 
+                    L 460,745 
+                    L 460,760 
+                    L 660,760" />
+                <path d="M 60,772 L 660,772" />
 
-  <rect x="710" y="120" width="170" height="90"
-        rx="6" fill="#fef08a" opacity=".8"/>
+                <!-- حوائط Lab 226 -->
+                <path d="
+                    M 60,772 
+                    L 60,880 
+                    L 45,880 
+                    L 45,1080 
+                    L 60,1080 
+                    L 60,1230 
+                    L 45,1230 
+                    L 45,1330 
+                    L 60,1330 
+                    L 60,1350 
+                    L 250,1350 
+                    L 250,1365 
+                    L 350,1365 
+                    L 350,1350 
+                    L 540,1350 
+                    L 540,1365 
+                    L 630,1365 
+                    L 630,1350 
+                    L 660,1350" />
 
-  <rect x="920" y="110" width="180" height="140"
-        rx="6" fill="#94a3b8" opacity=".45"/>
+                <!-- جدار الطرقة الداخلي مع الباب العلوي لـ Lab 227 -->
+                <path d="M 660,165 L 660,220 L 640,220 L 640,240 L 660,240" />
+                <path d="M 660,360 L 660,760" />
+                <path d="M 660,772 L 660,900 L 640,900 L 640,920 L 660,920" />
+                <line x1="660" y1="1040" x2="660" y2="1400" />
+            </g>
 
-  <rect x="710" y="350" width="260" height="160"
-        rx="6" fill="#94a3b8" opacity=".3"/>
+            <!-- مؤشر فتحة الدخول للطرقة -->
+            <line x1="995" y1="1270" x2="905" y2="1270" stroke="#0284c7" stroke-width="3.5" stroke-linecap="round" marker-end="url(#entrance-arrow)"/>
+            <rect x="910" y="1320" width="85" height="26" rx="5" fill="#0f172a" opacity="0.85"/>
+            <text x="952" y="1337" fill="#38bdf8" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle">ENTRANCE</text>
 
-  <!-- Furniture in Lab 226 -->
-  <rect x="490" y="660" width="160" height="160"
-        rx="6" fill="#94a3b8" opacity=".45"/>
+            <!-- باب Lab 227 -->
+            <path d="M 660,360 A 120 120 0 0 1 540,240" fill="none" stroke="#60a5fa" stroke-width="2" stroke-dasharray="4,4"/>
+            <line x1="660" y1="360" x2="575" y2="275" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="720" y1="300" x2="620" y2="300" stroke="#10b981" stroke-width="2.5" marker-end="url(#door-arrow)"/>
+            <rect x="575" y="215" width="60" height="20" rx="4" fill="#0f172a" opacity="0.8"/>
+            <text x="605" y="229" fill="#38bdf8" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle">DOOR باب</text>
 
-  <rect x="720" y="660" width="180" height="120"
-        rx="6" fill="#fef08a" opacity=".8"/>
+            <!-- باب Lab 226 -->
+            <path d="M 660,1040 A 120 120 0 0 1 540,920" fill="none" stroke="#60a5fa" stroke-width="2" stroke-dasharray="4,4"/>
+            <line x1="660" y1="1040" x2="575" y2="955" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="720" y1="980" x2="620" y2="980" stroke="#10b981" stroke-width="2.5" marker-end="url(#door-arrow)"/>
+            <rect x="575" y="895" width="60" height="20" rx="4" fill="#0f172a" opacity="0.8"/>
+            <text x="605" y="909" fill="#38bdf8" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle">DOOR باب</text>
 
-  <rect x="720" y="930" width="280" height="180"
-        rx="6" fill="#94a3b8" opacity=".35"/>
+            <!-- مسمى الطرقة -->
+            <text x="800" y="780" fill="#64748b" font-size="26" font-family="Arial" font-weight="bold" text-anchor="middle" transform="rotate(90 800 780)">CORRIDOR (الطرقة)</text>
+        </svg>`;
 
-  <!-- Room labels -->
-  <text x="250" y="650" fill="#64748b"
-        font-size="22" font-family="Arial"
-        font-weight="bold" text-anchor="middle"
-        transform="rotate(-90 250 650)">
-    CORRIDOR
-  </text>
-
-  <text x="790" y="300" fill="#1e293b"
-        font-size="30" font-family="Arial"
-        font-weight="bold" text-anchor="middle">
-    Lab 227
-  </text>
-
-  <text x="790" y="870" fill="#1e293b"
-        font-size="30" font-family="Arial"
-        font-weight="bold" text-anchor="middle">
-    Lab 226
-  </text>
-</svg>
-`;
-
+// Coordinates are expressed in the SVG's coordinate system (x, y).
+// The final waypoints return to the entrance through the corridor,
+// preventing a diagonal shortcut through the floor plan.
 const WAYPOINTS = [
-    { x: 50, y: 135, name: 'Main Entrance' },
-    { x: 180, y: 140, name: 'Main Corridor' },
-    { x: 250, y: 300, name: 'Main Corridor' },
-    { x: 250, y: 520, name: 'Outside Lab 227' },
-    { x: 420, y: 520, name: 'Lab 227 Entrance', door: true },
-    { x: 470, y: 520, name: 'Inside Lab 227', door: true },
-    { x: 600, y: 460, name: 'Inside Lab 227' },
-    { x: 750, y: 380, name: 'Inside Lab 227' },
-    { x: 860, y: 220, name: 'Inside Lab 227' },
-    { x: 750, y: 380, name: 'Inside Lab 227' },
-    { x: 470, y: 520, name: 'Lab 227 Exit', door: true },
-    { x: 420, y: 520, name: 'Back to Corridor', door: true },
-    { x: 250, y: 520, name: 'Main Corridor' },
-    { x: 250, y: 800, name: 'Outside Lab 226' },
-    { x: 250, y: 1050, name: 'Outside Lab 226' },
-    { x: 420, y: 1050, name: 'Lab 226 Entrance', door: true },
-    { x: 470, y: 1050, name: 'Inside Lab 226', door: true },
-    { x: 600, y: 1000, name: 'Inside Lab 226' },
-    { x: 750, y: 930, name: 'Inside Lab 226' },
-    { x: 860, y: 800, name: 'Inside Lab 226' },
-    { x: 750, y: 930, name: 'Inside Lab 226' },
-    { x: 470, y: 1050, name: 'Lab 226 Exit', door: true },
-    { x: 420, y: 1050, name: 'Back to Corridor', door: true },
-    { x: 250, y: 1050, name: 'Main Corridor' },
-    { x: 250, y: 1140, name: 'End of Corridor' },
-    { x: 250, y: 1050, name: 'Return Corridor' },
-    { x: 250, y: 800, name: 'Main Corridor' },
-    { x: 250, y: 520, name: 'Main Corridor' },
-    { x: 250, y: 300, name: 'Main Corridor' },
-    { x: 180, y: 140, name: 'Entrance Corridor' },
-    { x: 50, y: 135, name: 'Main Entrance' }
+    { x: 990, y: 1270, name: 'Outside Main Entrance' },
+    { x: 910, y: 1270, name: 'Main Entrance Threshold', door: true },
+    { x: 790, y: 1270, name: 'Main Corridor' },
+    { x: 790, y: 980, name: 'Corridor - Outside Lab 226' },
+
+    // Enter and navigate Lab 226.
+    { x: 670, y: 980, name: 'Lab 226 Doorway', door: true },
+    { x: 520, y: 980, name: 'Inside Lab 226', door: true },
+    { x: 200, y: 940, name: 'Lab 226 - Upper Area' },
+    { x: 200, y: 1180, name: 'Lab 226 - Lower Area' },
+    // Go below and around the yellow table before heading back to the door.
+    { x: 200, y: 1120, name: 'Lab 226 - Clear of Central Table' },
+    { x: 500, y: 1120, name: 'Lab 226 - Passing Central Table' },
+    { x: 520, y: 980, name: 'Lab 226 - Returning to Exit', door: true },
+    { x: 670, y: 980, name: 'Lab 226 Exit', door: true },
+    { x: 790, y: 980, name: 'Back in Main Corridor' },
+
+    // Follow the corridor toward Lab 227.
+    { x: 790, y: 500, name: 'Corridor - Toward Lab 227' },
+    { x: 790, y: 300, name: 'Corridor - Outside Lab 227' },
+
+    // Enter and navigate Lab 227.
+    { x: 670, y: 300, name: 'Lab 227 Doorway', door: true },
+    { x: 520, y: 300, name: 'Inside Lab 227', door: true },
+    { x: 200, y: 360, name: 'Lab 227 - Upper Area' },
+    { x: 200, y: 600, name: 'Lab 227 - Lower Area' },
+    // Move below and around the yellow table rather than through it.
+    { x: 200, y: 530, name: 'Lab 227 - Clear of Central Table' },
+    { x: 500, y: 530, name: 'Lab 227 - Passing Central Table' },
+    { x: 520, y: 300, name: 'Lab 227 - Returning to Exit', door: true },
+    { x: 670, y: 300, name: 'Lab 227 Exit', door: true },
+    { x: 790, y: 300, name: 'Back in Main Corridor' },
+    { x: 790, y: 200, name: 'Upper Corridor' },
+
+    // Complete the loop by returning down the corridor to the entrance.
+    { x: 790, y: 500, name: 'Main Corridor' },
+    { x: 790, y: 980, name: 'Main Corridor' },
+    { x: 790, y: 1270, name: 'Main Corridor - Near Entrance' },
+    { x: 910, y: 1270, name: 'Main Entrance Threshold', door: true },
+    { x: 990, y: 1270, name: 'Outside Main Entrance' },
 ];
 
 function IndoorMap({ onStatusChange }) {
     const mapElementRef = useRef(null);
     const mapInstanceRef = useRef(null);
+    const statusCallbackRef = useRef(onStatusChange);
+
+    // Keep the latest callback without rebuilding the Leaflet map on every render.
+    useEffect(() => {
+        statusCallbackRef.current = onStatusChange;
+    }, [onStatusChange]);
 
     useEffect(() => {
         const mapElement = mapElementRef.current;
 
-        if (!mapElement || mapInstanceRef.current) {
-            return;
-        }
+        if (!mapElement || mapInstanceRef.current) return undefined;
 
         let disposed = false;
         let animationFrameId = null;
@@ -175,7 +261,7 @@ function IndoorMap({ onStatusChange }) {
 
         const map = L.map(mapElement, {
             crs: L.CRS.Simple,
-            minZoom: -4,
+            minZoom: -3,
             maxZoom: 3,
             zoomSnap: 0.05,
             zoomDelta: 0.1,
@@ -186,74 +272,64 @@ function IndoorMap({ onStatusChange }) {
             doubleClickZoom: true,
             touchZoom: true,
             boxZoom: false,
-            keyboard: false
+            keyboard: false,
         });
 
         mapInstanceRef.current = map;
 
-        L.control.zoom({
-            position: 'topright'
-        }).addTo(map);
+        L.control.zoom({ position: 'topright' }).addTo(map);
 
         const fullBounds = [
             [0, 0],
-            [MAP_HEIGHT, MAP_WIDTH]
+            [MAP_HEIGHT, MAP_WIDTH],
         ];
 
         const svgUrl =
-            'data:image/svg+xml;charset=utf-8,' +
-            encodeURIComponent(svgMap);
+            'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMap);
 
         L.imageOverlay(svgUrl, fullBounds).addTo(map);
 
         map.fitBounds(fullBounds, {
-            paddingTopLeft: [20, 20],
-            paddingBottomRight: [20, 110],
-            animate: false
+            paddingTopLeft: [45, 25],
+            paddingBottomRight: [45, 95],
+            animate: false,
         });
 
+        // These bounds match the locations of the two labs in the new SVG.
         const roomBounds = {
             'Lab 227': [
-                [MAP_HEIGHT - 614, 430],
-                [MAP_HEIGHT - 60, 1157]
+                [MAP_HEIGHT - 755, 45],
+                [MAP_HEIGHT - 145, 660],
             ],
             'Lab 226': [
-                [MAP_HEIGHT - 1166, 430],
-                [MAP_HEIGHT - 580, 1157]
-            ]
+                [MAP_HEIGHT - 1365, 45],
+                [MAP_HEIGHT - 772, 660],
+            ],
         };
 
-        // Zoom into a room when entered.
-        // Zoom out to the complete floor plan when leaving it.
         function updateMapFocus(room) {
-            if (room === currentRoom) {
-                return;
-            }
+            if (room === currentRoom) return;
 
             currentRoom = room;
-
-            const targetBounds = room
-                ? roomBounds[room]
-                : fullBounds;
+            const targetBounds = room ? roomBounds[room] : fullBounds;
 
             map.stop();
-
             map.fitBounds(targetBounds, {
-                paddingTopLeft: room ? [30, 90] : [20, 20],
-                paddingBottomRight: room ? [30, 135] : [20, 110],
+                paddingTopLeft: room ? [25, 50] : [45, 25],
+                paddingBottomRight: room ? [25, 70] : [45, 95],
                 animate: true,
                 duration: 0.8,
-                easeLinearity: 0.25
+                easeLinearity: 0.25,
             });
         }
 
         const traceLine = L.polyline([], {
             color: '#2563eb',
-            weight: 4,
+            weight: 5,
             lineCap: 'round',
             lineJoin: 'round',
             opacity: 0.95,
-            interactive: false
+            interactive: false,
         }).addTo(map);
 
         const halo = L.circleMarker([0, 0], {
@@ -262,131 +338,93 @@ function IndoorMap({ onStatusChange }) {
             fillColor: '#93c5fd',
             fillOpacity: 0.35,
             weight: 2,
-            interactive: false
+            interactive: false,
         }).addTo(map);
 
         const marker = L.circleMarker([0, 0], {
-            radius: 7,
+            radius: 8,
             color: '#ffffff',
             fillColor: '#ef4444',
             fillOpacity: 1,
             weight: 3,
-            interactive: false
+            interactive: false,
         }).addTo(map);
 
+        // In the updated drawing, both labs are to the left of x=660.
         function getRoom(x, y) {
-            if (x <= 430) {
-                return null;
-            }
-
-            if (y >= 60 && y <= 600) {
-                return 'Lab 227';
-            }
-
-            if (y >= 580 && y <= 1166) {
-                return 'Lab 226';
-            }
-
+            if (x > 660) return null;
+            if (y >= 165 && y <= 760) return 'Lab 227';
+            if (y >= 772 && y <= 1365) return 'Lab 226';
             return null;
         }
 
         function animateMotion(timestamp) {
-            if (disposed) {
-                return;
-            }
+            if (disposed) return;
 
             const start = WAYPOINTS[waypointIndex];
-            const nextIndex =
-                (waypointIndex + 1) % WAYPOINTS.length;
+            const nextIndex = (waypointIndex + 1) % WAYPOINTS.length;
             const end = WAYPOINTS[nextIndex];
 
             const svgX = start.x + (end.x - start.x) * progress;
             const svgY = start.y + (end.y - start.y) * progress;
-
             const mapPosition = [MAP_HEIGHT - svgY, svgX];
 
             if (previousPosition !== null) {
                 const stepUnits = Math.hypot(
                     svgX - previousPosition.x,
-                    svgY - previousPosition.y
+                    svgY - previousPosition.y,
                 );
-
                 totalDistanceMeters += stepUnits * METERS_PER_UNIT;
             }
 
-            previousPosition = {
-                x: svgX,
-                y: svgY
-            };
+            previousPosition = { x: svgX, y: svgY };
 
             marker.setLatLng(mapPosition);
             halo.setLatLng(mapPosition);
 
             walkedPath.push(mapPosition);
-
-            if (walkedPath.length > 1200) {
-                walkedPath.shift();
-            }
-
+            if (walkedPath.length > 1200) walkedPath.shift();
             traceLine.setLatLngs(walkedPath);
 
             const room = getRoom(svgX, svgY);
-
-            // Run only when the detected room changes,
-            // not on every animation frame.
             updateMapFocus(room);
 
             if (
-                typeof onStatusChange === 'function' &&
+                typeof statusCallbackRef.current === 'function' &&
                 timestamp - lastStatusUpdate >= 80
             ) {
                 lastStatusUpdate = timestamp;
-
-                const distanceMiles =
-                    totalDistanceMeters / METERS_PER_MILE;
-
-                onStatusChange({
-                    location: room ? 'Inside ' + room : start.name,
-                    distance: distanceMiles.toFixed(6) + ' mi',
-                    isInRoom: Boolean(room)
+                statusCallbackRef.current({
+                    location: room ? `داخل ${room}` : start.name,
+                    distance: `${totalDistanceMeters.toFixed(1)} m`,
+                    isInRoom: Boolean(room),
                 });
             }
 
-            const speed =
-                start.door && end.door ? 0.0034 : 0.0018;
-
-            progress += speed;
+            const isCrossingDoor = Boolean(start.door && end.door);
+            progress += isCrossingDoor ? 0.0034 : 0.0018;
 
             if (progress >= 1) {
                 progress = 0;
                 waypointIndex = nextIndex;
             }
 
-            animationFrameId =
-                requestAnimationFrame(animateMotion);
+            animationFrameId = requestAnimationFrame(animateMotion);
         }
 
-        animationFrameId =
-            requestAnimationFrame(animateMotion);
+        animationFrameId = requestAnimationFrame(animateMotion);
 
         return () => {
             disposed = true;
-
             if (animationFrameId !== null) {
                 cancelAnimationFrame(animationFrameId);
             }
-
             map.remove();
             mapInstanceRef.current = null;
         };
-    }, [onStatusChange]);
+    }, []);
 
-    return (
-        <div
-            ref={mapElementRef}
-            className="indoor-map"
-        />
-    );
+    return <div ref={mapElementRef} className="indoor-map" />;
 }
 
 export default IndoorMap;
